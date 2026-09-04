@@ -61,6 +61,10 @@
         "title": "Confirm setup",
         "description": "Confirm {location}. Temperature station: {temperature_station}. Wind station: {wind_station}. Historical data is downloaded after setup and can take time to become available."
       },
+      "confirm_climate_unavailable": {
+        "title": "Confirm setup — climate service unavailable",
+        "description": "Confirm {location}. Temperature station: {temperature_station}. Wind station: {wind_station}. SMHI's climate service (PTHBV) could not be reached, so climate coverage could not be checked. You can finish setup now. Climate remains enabled and downloads are retried automatically, but climate sensors remain unavailable until data can be retrieved for this location. Historical observations are downloaded after setup."
+      },
       "reconfigure": {
         "title": "Reconfigure SMHI Weather Context",
         "description": "Update the location. The following steps let you review data products, comparison years, and stations before saving.",

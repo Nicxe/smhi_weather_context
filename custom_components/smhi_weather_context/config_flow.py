@@ -101,6 +101,7 @@ class SmhiWeatherContextConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         self._wind_stations: list[Station] = []
         self._reconfigure_entry: ConfigEntry | None = None
         self._discovery_complete = False
+        self._climate_deferred = False
 
     @staticmethod
     @callback
@@ -239,6 +240,7 @@ class SmhiWeatherContextConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
         )
 
     async def _async_discover(self) -> None:
+        self._climate_deferred = False
         location = Location(
             self._data[CONF_NAME],
             self._data[CONF_LATITUDE],
@@ -278,12 +280,17 @@ class SmhiWeatherContextConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
             ]
         if self._options[CONF_ENABLE_CLIMATE]:
             year = datetime.now(UTC).year - 2
-            await PthbvClient(api).async_daily(
-                location,
-                year,
-                year,
-                precipitation=self._options[CONF_ENABLE_PRECIPITATION],
-            )
+            try:
+                await PthbvClient(api).async_daily(
+                    location,
+                    year,
+                    year,
+                    precipitation=self._options[CONF_ENABLE_PRECIPITATION],
+                )
+            except SmhiApiConnectionError:
+                # Optional climate history must not block working observations.
+                # Keep the option enabled; the coordinator retries after setup.
+                self._climate_deferred = True
         self._discovery_complete = True
 
     @staticmethod
@@ -437,7 +444,9 @@ class SmhiWeatherContextConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 options=self._options,
             )
         return self.async_show_form(
-            step_id="confirm",
+            step_id=(
+                "confirm_climate_unavailable" if self._climate_deferred else "confirm"
+            ),
             data_schema=vol.Schema({}),
             description_placeholders={
                 "location": self._data[CONF_NAME],
@@ -447,6 +456,12 @@ class SmhiWeatherContextConfigFlow(config_entries.ConfigFlow, domain=DOMAIN):
                 "wind_station": self._data.get(CONF_WIND_STATION_NAME, "—"),
             },
         )
+
+    async def async_step_confirm_climate_unavailable(
+        self, user_input: dict[str, Any] | None = None
+    ) -> ConfigFlowResult:
+        """Confirm setup with an explicit warning about deferred climate data."""
+        return await self.async_step_confirm(user_input)
 
 
 class SmhiOptionsFlow(OptionsFlowWithReload):

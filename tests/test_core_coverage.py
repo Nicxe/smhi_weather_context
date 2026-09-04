@@ -147,7 +147,7 @@ def test_url_validation_rejects_malformed_ports(url: str) -> None:
     [
         (400, SmhiCoverageError, "outside SMHI coverage"),
         (403, SmhiApiResponseError, "HTTP 403"),
-        (503, SmhiApiResponseError, "HTTP 503"),
+        (503, SmhiApiConnectionError, "HTTP 503"),
     ],
 )
 async def test_api_terminal_http_statuses_are_sanitized_and_released(

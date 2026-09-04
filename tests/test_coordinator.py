@@ -9,7 +9,10 @@ from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
 
-from custom_components.smhi_weather_context.api import SmhiApiError
+from custom_components.smhi_weather_context.api import (
+    SmhiApiError,
+    SmhiApiUnavailableError,
+)
 from custom_components.smhi_weather_context.calculations import completed_local_hour
 from custom_components.smhi_weather_context.const import (
     PARAM_TEMPERATURE,
@@ -101,6 +104,37 @@ def _current_observation(value: float, *, age: timedelta = timedelta()) -> Obser
 
 def _skip_history_refresh(coordinator: SmhiWeatherContextCoordinator) -> None:
     coordinator._history_date = completed_local_hour(datetime.now(UTC)).date()
+
+
+async def test_climate_outage_preserves_temperature_and_recovers_on_refresh() -> None:
+    """A deferred climate source retries without reconfiguring or hiding observations."""
+    coordinator, metobs, pthbv, cache = _coordinator(options=_options(climate=True))
+    coordinator.enable_history()
+    cache.async_get.return_value = None
+    metobs.async_latest_day.return_value = ([_current_observation(14.5)], {})
+    target = completed_local_hour(datetime.now(UTC))
+    climate = {
+        "dates": [
+            f"{year}-{target.month:02d}-{target.day:02d}" for year in range(1991, 2021)
+        ],
+        "point_values": [{"t": [10.0] * 30}],
+    }
+    pthbv.async_daily.side_effect = [SmhiApiUnavailableError("HTTP 503"), climate]
+    with patch(
+        "custom_components.smhi_weather_context.coordinator.parse_archive_for_dates",
+        return_value=[],
+    ):
+        first = await coordinator._async_build_data()
+        assert first.values["temperature_now"] == 14.5
+        assert first.values["temperature_climate_normal"] is None
+        assert not coordinator._history_status["climate"].available
+        assert coordinator._history_date is None
+        recovered = await coordinator._async_build_data()
+    assert recovered.values["temperature_now"] == 14.5
+    assert recovered.values["temperature_climate_normal"] == 10.0
+    assert coordinator._history_status["climate"].available
+    assert coordinator._history_date == target.date()
+    assert pthbv.async_daily.await_count == 2
 
 
 async def test_partial_current_source_failure_keeps_successful_temperature() -> None:
