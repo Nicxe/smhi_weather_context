@@ -61,6 +61,10 @@
         "title": "Bekräfta konfigurationen",
         "description": "Bekräfta {location}. Temperaturstation: {temperature_station}. Vindstation: {wind_station}. Historiska data hämtas efter konfigurationen och kan ta en stund att bli tillgängliga."
       },
+      "confirm_climate_unavailable": {
+        "title": "Bekräfta konfigurationen — klimattjänsten är inte tillgänglig",
+        "description": "Bekräfta {location}. Temperaturstation: {temperature_station}. Vindstation: {wind_station}. SMHI:s klimattjänst (PTHBV) kunde inte nås och klimattäckningen kunde därför inte kontrolleras. Du kan slutföra konfigurationen nu. Klimat förblir aktiverat och hämtningen försöker igen automatiskt, men klimatsensorerna är otillgängliga tills data kan hämtas för platsen. Historiska observationer hämtas efter konfigurationen."
+      },
       "reconfigure": {
         "title": "Konfigurera om SMHI Väderperspektiv",
         "description": "Uppdatera platsen. I följande steg kan du granska datakällor, jämförelseår och stationer innan du sparar.",

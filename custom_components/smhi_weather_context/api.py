@@ -4,6 +4,8 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Mapping
+from datetime import UTC, datetime
+from email.utils import parsedate_to_datetime
 import json
 from typing import Any
 from urllib.parse import urlencode, urljoin, urlparse
@@ -23,6 +25,26 @@ class SmhiApiConnectionError(SmhiApiError):
 
 class SmhiApiResponseError(SmhiApiError):
     """SMHI returned invalid or unexpected data."""
+
+
+class SmhiApiUnavailableError(SmhiApiConnectionError):
+    """SMHI returned a transient HTTP failure."""
+
+
+def _retry_delay(value: str | None, attempt: int) -> float:
+    """Respect Retry-After seconds or HTTP dates, otherwise use backoff."""
+    fallback: float = 0.25 * (2**attempt)
+    if value is None:
+        return fallback
+    if value.isascii() and value.isdecimal():
+        return float(value)
+    try:
+        retry_at = parsedate_to_datetime(value)
+    except TypeError, ValueError, OverflowError:
+        return fallback
+    if retry_at.tzinfo is None:
+        return fallback
+    return max(0.0, (retry_at - datetime.now(UTC)).total_seconds())
 
 
 class SmhiCoverageError(SmhiApiError):
@@ -63,12 +85,15 @@ class SmhiApiClient:
         for attempt in range(attempts):
             try:
                 response = await self._request_with_validated_redirects(url)
-                if (
-                    response.status in {408, 425, 429, 500, 502, 503, 504}
-                    and attempt + 1 < attempts
-                ):
+                if response.status in {408, 425, 429, 500, 502, 503, 504}:
+                    status = response.status
+                    delay = _retry_delay(response.headers.get("Retry-After"), attempt)
                     response.release()
-                    await asyncio.sleep(0.25 * (2**attempt))
+                    # Do not block a config flow for a long server-requested wait,
+                    # and never retry earlier than the server permits.
+                    if attempt + 1 >= attempts or delay > 30:
+                        raise SmhiApiUnavailableError(f"SMHI returned HTTP {status}")
+                    await asyncio.sleep(delay)
                     continue
                 if response.status == 400:
                     response.release()

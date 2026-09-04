@@ -3,6 +3,8 @@
 from __future__ import annotations
 
 from collections.abc import AsyncIterator
+from datetime import UTC, datetime, timedelta
+from email.utils import format_datetime
 from unittest.mock import AsyncMock
 
 from aiohttp import ClientConnectionError, ClientPayloadError
@@ -13,11 +15,64 @@ from custom_components.smhi_weather_context.api import (
     SmhiApiClient,
     SmhiApiConnectionError,
     SmhiApiResponseError,
+    SmhiApiUnavailableError,
+    _retry_delay,
     build_url,
     validate_smhi_url,
 )
 
 METOBS_URL = "https://opendata-download-metobs.smhi.se/api.json"
+
+
+@pytest.mark.parametrize(
+    ("header", "expected"),
+    [
+        (None, 0.25),
+        ("5", 5),
+        ("0", 0),
+        ("-1", 0.25),
+        ("invalid", 0.25),
+        ("Wed, 01 Jan 2020 00:00:00", 0.25),
+        ("Wed, 01 Jan 2020 00:00:00 GMT", 0),
+    ],
+)
+def test_retry_after_parsing(header: str | None, expected: float) -> None:
+    assert _retry_delay(header, 0) == expected
+
+
+def test_retry_after_http_date() -> None:
+    value = format_datetime(datetime.now(UTC) + timedelta(seconds=20), usegmt=True)
+    assert 18 < _retry_delay(value, 0) <= 20
+
+
+@pytest.mark.asyncio
+async def test_client_honors_retry_after(monkeypatch: pytest.MonkeyPatch) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_module.asyncio, "sleep", sleep)
+    responses = [FakeResponse(503, headers={"Retry-After": "5"}) for _ in range(3)]
+    session = FakeSession(*responses)
+    with pytest.raises(SmhiApiUnavailableError, match="HTTP 503"):
+        await SmhiApiClient(session).async_get_json(METOBS_URL)
+    assert len(session.calls) == 3
+    assert [call.args for call in sleep.await_args_list] == [(5.0,), (5.0,)]
+    assert all(response.released for response in responses)
+
+
+@pytest.mark.asyncio
+async def test_long_retry_after_defers_without_retrying_early(
+    monkeypatch: pytest.MonkeyPatch,
+) -> None:
+    sleep = AsyncMock()
+    monkeypatch.setattr(api_module.asyncio, "sleep", sleep)
+    response = FakeResponse(429, headers={"Retry-After": "120"})
+    session = FakeSession(response)
+    with pytest.raises(SmhiApiConnectionError, match="HTTP 429"):
+        await SmhiApiClient(session).async_get_json(METOBS_URL)
+    assert len(session.calls) == 1
+    assert response.released
+    sleep.assert_not_awaited()
+
+
 PTHBV_URL = (
     "https://opendata-download-metanalys.smhi.se/api/category/pthbv1g/"
     "version/1/geotype/multipoint/from/1991/to/2020/period/daily/data.json"

@@ -13,6 +13,8 @@ from pytest_homeassistant_custom_component.common import MockConfigEntry
 
 from custom_components.smhi_weather_context.api import (
     SmhiApiConnectionError,
+    SmhiApiResponseError,
+    SmhiApiUnavailableError,
     SmhiCoverageError,
 )
 from custom_components.smhi_weather_context.const import (
@@ -114,6 +116,59 @@ async def _submit_content_and_comparisons(
             result["flow_id"], COMPARISON_INPUT
         )
     return result, metobs, pthbv
+
+
+@pytest.mark.parametrize(
+    "error", [SmhiApiUnavailableError("HTTP 503"), SmhiApiConnectionError("offline")]
+)
+@pytest.mark.parametrize("temperature", [True, False])
+async def test_climate_outage_allows_explicit_confirmation(
+    hass: HomeAssistant,
+    temperature_station: Station,
+    error: Exception,
+    temperature: bool,
+) -> None:
+    """Optional climate outages retain climate and never block working stations."""
+    result = await _start_flow(hass)
+    result, metobs, pthbv = await _submit_content_and_comparisons(
+        hass,
+        result,
+        features={
+            **FEATURE_INPUT,
+            CONF_ENABLE_WIND: False,
+            CONF_ENABLE_TEMPERATURE: temperature,
+        },
+        station_result=[temperature_station],
+        pthbv_error=error,
+    )
+    _assert_form(result, "stations")
+    assert result["errors"] == {}
+    result = await hass.config_entries.flow.async_configure(
+        result["flow_id"],
+        {CONF_TEMPERATURE_STATION: str(temperature_station.station_id)}
+        if temperature
+        else {},
+    )
+    _assert_form(result, "confirm_climate_unavailable")
+    pthbv.assert_awaited_once()
+    assert metobs.await_count == int(temperature)
+    result = await hass.config_entries.flow.async_configure(result["flow_id"], {})
+    assert result["type"] is FlowResultType.CREATE_ENTRY
+    assert result["options"][CONF_ENABLE_CLIMATE] is True
+    assert result["options"][CONF_ENABLE_PRECIPITATION] is False
+
+
+async def test_malformed_climate_response_still_blocks_setup(
+    hass: HomeAssistant, temperature_station: Station
+) -> None:
+    result = await _start_flow(hass)
+    result, _, _ = await _submit_content_and_comparisons(
+        hass,
+        result,
+        station_result=[temperature_station],
+        pthbv_error=SmhiApiResponseError("invalid JSON"),
+    )
+    assert result["errors"] == {"base": "invalid_response"}
 
 
 async def test_user_flow_walks_every_step_and_creates_entry(
