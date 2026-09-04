@@ -51,11 +51,12 @@ async def test_client_honors_retry_after(monkeypatch: pytest.MonkeyPatch) -> Non
     monkeypatch.setattr(api_module.asyncio, "sleep", sleep)
     responses = [FakeResponse(503, headers={"Retry-After": "5"}) for _ in range(3)]
     session = FakeSession(*responses)
-    with pytest.raises(SmhiApiUnavailableError, match="HTTP 503"):
+    with pytest.raises(SmhiApiUnavailableError, match="HTTP 503") as raised:
         await SmhiApiClient(session).async_get_json(METOBS_URL)
     assert len(session.calls) == 3
     assert [call.args for call in sleep.await_args_list] == [(5.0,), (5.0,)]
     assert all(response.released for response in responses)
+    assert raised.value.http_status == 503
 
 
 @pytest.mark.asyncio
@@ -66,11 +67,12 @@ async def test_long_retry_after_defers_without_retrying_early(
     monkeypatch.setattr(api_module.asyncio, "sleep", sleep)
     response = FakeResponse(429, headers={"Retry-After": "120"})
     session = FakeSession(response)
-    with pytest.raises(SmhiApiConnectionError, match="HTTP 429"):
+    with pytest.raises(SmhiApiConnectionError, match="HTTP 429") as raised:
         await SmhiApiClient(session).async_get_json(METOBS_URL)
     assert len(session.calls) == 1
     assert response.released
     sleep.assert_not_awaited()
+    assert raised.value.http_status == 429
 
 
 PTHBV_URL = (

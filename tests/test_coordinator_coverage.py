@@ -11,6 +11,7 @@ from zoneinfo import ZoneInfo
 
 from homeassistant.helpers.update_coordinator import UpdateFailed
 import pytest
+from test_pthbv import complete_pthbv
 
 from custom_components.smhi_weather_context.api import SmhiApiError
 from custom_components.smhi_weather_context.const import (
@@ -385,7 +386,7 @@ async def test_archive_cache_fresh_fetch_write_and_total_failure() -> None:
 async def test_pthbv_cache_fresh_fetch_write_and_total_failure() -> None:
     """PTHBV caching follows the same fresh, write, and stale-fallback contract."""
     target = _target()
-    payload = {"dates": ["1991-01-15"], "point_values": [{"t": [1.0]}]}
+    payload = complete_pthbv(1961, target.year - 1)
     encoded = json.dumps(payload)
     fresh_coordinator, _, fresh_pthbv, fresh_cache = _coordinator(
         options=_options(temperature=False, climate=True)
@@ -399,10 +400,10 @@ async def test_pthbv_cache_fresh_fetch_write_and_total_failure() -> None:
         options=_options(temperature=False, climate=True)
     )
     invalid_cache.async_get.return_value = _record("[]")
+    invalid_pthbv.async_daily.return_value = payload
 
-    with pytest.raises(SmhiApiError, match="Cached PTHBV data is invalid"):
-        await invalid_coordinator._async_pthbv(target)
-    invalid_pthbv.async_daily.assert_not_awaited()
+    assert await invalid_coordinator._async_pthbv(target) == payload
+    invalid_pthbv.async_daily.assert_awaited_once()
 
     write_coordinator, _, write_pthbv, write_cache = _coordinator(
         options=_options(temperature=False, climate=True, precipitation=True)

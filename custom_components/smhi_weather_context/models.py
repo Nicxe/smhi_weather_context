@@ -54,12 +54,15 @@ class Observation:
 
 @dataclass(frozen=True, slots=True)
 class SourceStatus:
-    """Status for one upstream source."""
+    """Source status; refresh timestamps include validated reads from local cache."""
 
     available: bool
     stale: bool = False
     last_update: datetime | None = None
     error: str | None = None
+    last_attempt: datetime | None = None
+    last_success: datetime | None = None
+    http_status: int | None = None
 
 
 @dataclass(slots=True)

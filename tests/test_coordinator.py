@@ -8,6 +8,7 @@ from types import SimpleNamespace
 from unittest.mock import AsyncMock, Mock, patch
 
 import pytest
+from test_pthbv import complete_pthbv
 
 from custom_components.smhi_weather_context.api import (
     SmhiApiError,
@@ -249,7 +250,8 @@ async def test_pthbv_uses_stale_cache_when_smhi_is_unavailable() -> None:
     coordinator, _, pthbv, cache = _coordinator(
         options=_options(temperature=False, climate=True)
     )
-    payload = {"dates": ["1991-09-03"], "point_values": [{"t": [12.0]}]}
+    target = completed_local_hour(datetime.now(UTC))
+    payload = complete_pthbv(1961, target.year - 1)
     stale = CacheRecord(
         payload=json.dumps(payload),
         stored_at=datetime.now(UTC) - timedelta(days=60),
@@ -258,10 +260,66 @@ async def test_pthbv_uses_stale_cache_when_smhi_is_unavailable() -> None:
     cache.async_get.side_effect = [None, stale]
     pthbv.async_daily.side_effect = SmhiApiError("offline")
 
-    result = await coordinator._async_pthbv(completed_local_hour(datetime.now(UTC)))
+    result = await coordinator._async_pthbv(target)
 
     assert result == payload
     assert cache.async_get.await_count == 2
+    cache.async_set.assert_not_awaited()
+
+
+@pytest.mark.parametrize("payload", ["not-json", "[]", '{"dates": []}'])
+async def test_invalid_climate_cache_preserves_upstream_http_failure(
+    payload: str,
+) -> None:
+    """Unusable cache must neither hide HTTP 503 nor block future network retries."""
+    coordinator, _, pthbv, cache = _coordinator(
+        options=_options(temperature=False, climate=True)
+    )
+    cache.async_get.return_value = CacheRecord(
+        payload=payload, stored_at=datetime.now(UTC), metadata={"source": "PTHBV"}
+    )
+    error = SmhiApiUnavailableError("HTTP 503", http_status=503)
+    pthbv.async_daily.side_effect = error
+    data = await coordinator._async_build_data()
+    assert data.values["temperature_climate_normal"] is None
+    assert data.values["smhi_last_historical_update"] is None
+    assert data.source_status["climate"].http_status == 503
+    assert data.source_status["climate"].last_success is None
+    assert not data.source_status["climate"].available
+    assert cache.async_get.await_count == 2
+    pthbv.async_daily.assert_awaited_once()
+    cache.async_set.assert_not_awaited()
+
+
+async def test_full_climate_cache_is_rederived_for_each_calendar_day() -> None:
+    """A validated full series remains useful offline without reusing daily samples."""
+    coordinator, _, pthbv, cache = _coordinator(
+        options=_options(temperature=False, climate=True)
+    )
+    target = completed_local_hour(datetime(2026, 9, 4, 12, tzinfo=UTC))
+    tomorrow = target + timedelta(days=1)
+    payload = complete_pthbv(1961, 2025)
+    payload["point_values"][0]["t"] = [
+        5.0 if raw_date.endswith("-09-04") else 9.0 for raw_date in payload["dates"]
+    ]
+    record = CacheRecord(
+        payload=json.dumps(payload),
+        stored_at=datetime(2026, 7, 1, tzinfo=UTC),
+        metadata={"source": "PTHBV"},
+    )
+    cache.async_get.side_effect = [None, record, None, record]
+    pthbv.async_daily.side_effect = SmhiApiUnavailableError("HTTP 503", http_status=503)
+    with patch(
+        "custom_components.smhi_weather_context.coordinator.completed_local_hour",
+        side_effect=[target, tomorrow],
+    ):
+        first = await coordinator._async_build_data()
+        second = await coordinator._async_build_data()
+    assert first.values["temperature_climate_normal"] == 5.0
+    assert second.values["temperature_climate_normal"] == 9.0
+    assert coordinator._history_values_date == tomorrow.date()
+    assert second.source_status["climate"].available
+    assert pthbv.async_daily.await_count == 2
     cache.async_set.assert_not_awaited()
 
 

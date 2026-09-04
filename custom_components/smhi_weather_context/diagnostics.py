@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import datetime
 import re
 from typing import Any
 
@@ -11,10 +12,11 @@ from homeassistant.core import HomeAssistant
 ALLOWED_SOURCES = frozenset(
     {
         "temperature",
+        "temperature_history",
         "wind_speed",
         "wind_direction",
         "wind_gust",
-        "wind",
+        "wind_history",
         "climate",
     }
 )
@@ -54,6 +56,16 @@ def _safe_error_type(value: str | None) -> str | None:
     return value if value and SAFE_ERROR_TYPE.fullmatch(value) else None
 
 
+def _safe_http_status(value: object) -> int | None:
+    """Expose only an HTTP status number, never a provider-controlled string."""
+    return value if type(value) is int and 100 <= value <= 599 else None
+
+
+def _safe_timestamp(value: object) -> datetime | None:
+    """Exclude unexpected text from timestamp fields."""
+    return value if isinstance(value, datetime) else None
+
+
 def _safe_calculated_keys(values: dict[str, Any]) -> list[str]:
     """Return a bounded allowlist of public entity keys."""
     return sorted(
@@ -66,9 +78,12 @@ def _safe_calculated_keys(values: dict[str, Any]) -> list[str]:
 async def async_get_config_entry_diagnostics(
     hass: HomeAssistant, entry: ConfigEntry
 ) -> dict[str, Any]:
-    """Return diagnostics with coordinates rounded to roughly kilometre precision."""
+    """Return bounded diagnostics without location or provider-response details."""
     options = entry.runtime_data.options
     coordinator = entry.runtime_data.coordinator
+    source_status = getattr(
+        coordinator, "source_status", coordinator.data.source_status
+    )
     return {
         "entry": {
             "title": "**REDACTED**",
@@ -94,10 +109,19 @@ async def async_get_config_entry_diagnostics(
                 key: {
                     "available": status.available,
                     "stale": status.stale,
-                    "last_update": status.last_update,
+                    "last_update": _safe_timestamp(status.last_update),
+                    "last_attempt": _safe_timestamp(
+                        getattr(status, "last_attempt", None)
+                    ),
+                    "last_success": _safe_timestamp(
+                        getattr(status, "last_success", None)
+                    ),
+                    "http_status": _safe_http_status(
+                        getattr(status, "http_status", None)
+                    ),
                     "error_type": _safe_error_type(status.error),
                 }
-                for key, status in coordinator.data.source_status.items()
+                for key, status in source_status.items()
                 if key in ALLOWED_SOURCES
             },
             "calculated_keys": _safe_calculated_keys(coordinator.data.values),

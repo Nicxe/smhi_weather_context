@@ -108,6 +108,9 @@ async def test_diagnostics_schema_is_a_positive_allowlist() -> None:
         "available",
         "stale",
         "last_update",
+        "last_attempt",
+        "last_success",
+        "http_status",
         "error_type",
     }
     serialized = _serialized(payload)
@@ -197,3 +200,55 @@ async def test_diagnostics_output_is_bounded() -> None:
     )
 
     assert len(_serialized(payload).encode("utf-8")) <= MAX_DIAGNOSTICS_BYTES
+
+
+async def test_diagnostics_exposes_safe_refresh_status_and_separate_history() -> None:
+    """Support bundles distinguish current observations from historical refreshes."""
+    attempted_at = datetime(2026, 9, 4, 12, tzinfo=UTC)
+    succeeded_at = datetime(2026, 9, 3, 12, tzinfo=UTC)
+    status = SimpleNamespace(
+        available=False,
+        stale=False,
+        last_update=succeeded_at,
+        last_attempt=attempted_at,
+        last_success=succeeded_at,
+        http_status=503,
+        error="SmhiApiUnavailableError",
+    )
+    entry = _entry(source_status={"temperature": status})
+    # A completely failed update does not replace coordinator.data. Diagnostics
+    # must nevertheless show its latest attempt rather than the old data snapshot.
+    entry.runtime_data.coordinator.source_status = {
+        "temperature_history": status,
+        "wind_history": status,
+        "climate": status,
+    }
+    payload = await async_get_config_entry_diagnostics(SimpleNamespace(), entry)
+    statuses = payload["coordinator"]["source_status"]
+    assert set(statuses) == {"temperature_history", "wind_history", "climate"}
+    assert statuses["climate"]["http_status"] == 503
+    assert statuses["climate"]["last_attempt"] == attempted_at
+    assert statuses["climate"]["last_success"] == succeeded_at
+
+
+@pytest.mark.parametrize("http_status", [None, 99, 600, True, 503.0, "PRIVATE STATUS"])
+async def test_diagnostics_rejects_unsafe_refresh_metadata(http_status: object) -> None:
+    """New fields cannot disclose error bodies, URLs, tokens or location strings."""
+    status = SimpleNamespace(
+        available=False,
+        stale=False,
+        error=None,
+        last_update="PRIVATE TIMESTAMP",
+        last_attempt="PRIVATE ATTEMPT",
+        last_success="PRIVATE SUCCESS",
+        http_status=http_status,
+    )
+    payload = await async_get_config_entry_diagnostics(
+        SimpleNamespace(), _entry(source_status={"climate": status})
+    )
+    exposed = payload["coordinator"]["source_status"]["climate"]
+    assert exposed["http_status"] is None
+    assert exposed["last_update"] is None
+    assert exposed["last_attempt"] is None
+    assert exposed["last_success"] is None
+    assert "PRIVATE" not in _serialized(payload)

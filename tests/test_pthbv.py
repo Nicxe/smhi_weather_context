@@ -8,6 +8,7 @@ from datetime import date, timedelta
 import json
 import math
 from pathlib import Path
+import traceback
 from urllib.parse import parse_qs, urlparse
 
 import pytest
@@ -16,6 +17,7 @@ from custom_components.smhi_weather_context.api import SmhiApiResponseError
 from custom_components.smhi_weather_context.models import Location
 from custom_components.smhi_weather_context.pthbv import (
     PthbvClient,
+    validate_daily_data,
     values_for_calendar_date,
 )
 
@@ -26,10 +28,10 @@ def load_pthbv() -> dict[str, object]:
     return json.loads((FIXTURES / "api_pthbv_daily.json").read_text(encoding="utf-8"))
 
 
-def complete_pthbv() -> dict[str, object]:
-    """Build a compact-valued but date-complete 1991-2020 response."""
-    current = date(1991, 1, 1)
-    end = date(2020, 12, 31)
+def complete_pthbv(start_year: int = 1991, end_year: int = 2020) -> dict[str, object]:
+    """Build a compact-valued, date-complete response for the requested years."""
+    current = date(start_year, 1, 1)
+    end = date(end_year, 12, 31)
     dates: list[str] = []
     while current <= end:
         dates.append(current.isoformat())
@@ -177,6 +179,164 @@ async def test_daily_rejects_invalid_pthbv_schema(
             2020,
             precipitation=True,
         )
+
+
+@pytest.mark.parametrize("precipitation", [False, True])
+@pytest.mark.parametrize(
+    "years", [(1991, 2020), (1961, 2025), (2023, 2023), (2024, 2024)]
+)
+def test_validator_accepts_complete_cached_series_without_mutation_or_network(
+    years: tuple[int, int], precipitation: bool, no_smhi_network: None
+) -> None:
+    cached = json.loads(json.dumps(complete_pthbv(*years)))
+    point = cached["point_values"][0]
+    if not precipitation:
+        point.pop("p")
+    for variable in point.keys() & {"t", "p"}:
+        point[variable][:4] = [None, 0, -1.5, "2.5"]
+    original = deepcopy(cached)
+
+    result = validate_daily_data(cached, *years, precipitation=precipitation)
+
+    assert result is cached
+    assert cached == original
+    assert values_for_calendar_date(result, 1, 1, "t") == dict.fromkeys(
+        range(years[0] + 1, years[1] + 1), 12.1
+    )
+
+
+@pytest.mark.parametrize("payload", [None, [], "invalid", True, 4326, {}])
+def test_validator_rejects_invalid_cached_root(payload: object) -> None:
+    cached = json.loads(json.dumps(payload))
+
+    with pytest.raises(SmhiApiResponseError, match="structure is invalid"):
+        validate_daily_data(cached, 1991, 2020)
+
+
+@pytest.mark.parametrize("missing", ["dates", "point_values", "coord_sys_info"])
+def test_validator_requires_cached_schema(missing: str) -> None:
+    payload = complete_pthbv()
+    payload.pop(missing)
+    cached = json.loads(json.dumps(payload))
+
+    with pytest.raises(SmhiApiResponseError, match="is invalid"):
+        validate_daily_data(cached, 1991, 2020)
+
+
+@pytest.mark.parametrize(
+    ("field", "value", "message"),
+    [
+        ("dates", None, "structure is invalid"),
+        ("dates", "1991-01-01", "structure is invalid"),
+        ("point_values", {}, "structure is invalid"),
+        ("point_values", [], "structure is invalid"),
+        ("point_values", [{}, {}], "structure is invalid"),
+        ("point_values", [None], "point data is invalid"),
+        ("coord_sys_info", None, "coordinate system is invalid"),
+        ("coord_sys_info", "EPSG:4326", "coordinate system is invalid"),
+        ("coord_sys_info", {}, "coordinate system is invalid"),
+        ("coord_sys_info", {"EPSG": 3006}, "coordinate system is invalid"),
+        ("coord_sys_info", {"EPSG": "4326"}, "coordinate system is invalid"),
+    ],
+)
+def test_validator_rejects_bad_cached_schema(
+    field: str, value: object, message: str
+) -> None:
+    payload = complete_pthbv()
+    payload[field] = value
+    cached = json.loads(json.dumps(payload))
+
+    with pytest.raises(SmhiApiResponseError, match=message):
+        validate_daily_data(cached, 1991, 2020, precipitation=True)
+
+
+@pytest.mark.parametrize("variable", ["t", "p"])
+@pytest.mark.parametrize("values", [None, {}, "1.0", [], [1.0]])
+def test_validator_requires_complete_requested_cached_variables(
+    variable: str, values: object
+) -> None:
+    cached = json.loads(json.dumps(complete_pthbv()))
+    if values is None:
+        cached["point_values"][0].pop(variable)
+    else:
+        cached["point_values"][0][variable] = values
+
+    with pytest.raises(SmhiApiResponseError, match="values do not match dates"):
+        validate_daily_data(cached, 1991, 2020, precipitation=True)
+
+
+@pytest.mark.parametrize(
+    "case", ["empty", "missing-start", "missing-end", "gap", "duplicate", "unordered"]
+)
+def test_validator_rejects_incomplete_or_unordered_cached_period(case: str) -> None:
+    cached = json.loads(json.dumps(complete_pthbv()))
+    dates = cached["dates"]
+    arrays = [dates, cached["point_values"][0]["t"], cached["point_values"][0]["p"]]
+    if case == "empty":
+        for array in arrays:
+            array.clear()
+    elif case in {"missing-start", "missing-end", "gap"}:
+        index = {"missing-start": 0, "missing-end": -1, "gap": 100}[case]
+        for array in arrays:
+            array.pop(index)
+    elif case == "duplicate":
+        dates[1] = dates[0]
+    else:
+        dates[1], dates[2] = dates[2], dates[1]
+
+    with pytest.raises(SmhiApiResponseError, match="period is incomplete or unordered"):
+        validate_daily_data(cached, 1991, 2020, precipitation=True)
+
+
+@pytest.mark.parametrize("years", [(1992, 2021), (1991, 2019), (1990, 2020)])
+def test_validator_rejects_complete_cache_for_wrong_period(
+    years: tuple[int, int],
+) -> None:
+    cached = json.loads(json.dumps(complete_pthbv()))
+
+    with pytest.raises(SmhiApiResponseError, match="period is incomplete or unordered"):
+        validate_daily_data(cached, *years)
+
+
+@pytest.mark.parametrize(
+    "value",
+    [None, True, {}, [], 19910101, "bad-date", "1991-02-29", "1991-01-01T00:00:00"],
+)
+def test_validator_rejects_malformed_cached_dates(value: object) -> None:
+    cached = json.loads(json.dumps(complete_pthbv()))
+    cached["dates"][0] = value
+
+    with pytest.raises(SmhiApiResponseError, match="dates are invalid"):
+        validate_daily_data(cached, 1991, 2020)
+
+
+@pytest.mark.parametrize("variable", ["t", "p"])
+@pytest.mark.parametrize(
+    "value",
+    [True, False, {}, [], "invalid", "NaN", "Infinity", "-Infinity", 10**400],
+    ids=["true", "false", "object", "array", "text", "nan", "inf", "-inf", "overflow"],
+)
+def test_validator_rejects_invalid_cached_measurements(
+    variable: str, value: object
+) -> None:
+    cached = json.loads(json.dumps(complete_pthbv()))
+    cached["point_values"][0][variable][0] = value
+
+    with pytest.raises(SmhiApiResponseError, match="contains invalid values"):
+        validate_daily_data(cached, 1991, 2020, precipitation=True)
+
+
+@pytest.mark.parametrize("field", ["dates", "t"])
+def test_validator_errors_do_not_expose_cached_content(field: str) -> None:
+    cached = json.loads(json.dumps(complete_pthbv()))
+    private_value = "private-location-from-cache"
+    values = cached["dates"] if field == "dates" else cached["point_values"][0]["t"]
+    values[0] = private_value
+
+    with pytest.raises(SmhiApiResponseError) as error:
+        validate_daily_data(cached, 1991, 2020)
+
+    assert private_value not in "".join(traceback.format_exception(error.value))
 
 
 def test_values_for_calendar_date_aligns_parallel_arrays() -> None:
