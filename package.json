@@ -1,0 +1,26 @@
+{
+  "name": "smhi-weather-context-release-tooling",
+  "version": "0.0.0-development",
+  "private": true,
+  "description": "Release tooling for the SMHI Weather Context Home Assistant integration",
+  "license": "MIT",
+  "packageManager": "npm@10.9.8",
+  "engines": {
+    "node": "^22.14.0 || >=24.10.0"
+  },
+  "scripts": {
+    "release:dry-run": "semantic-release --dry-run",
+    "verify:release": "python3 scripts/verify_release.py",
+    "verify:release:config": "python3 scripts/verify_release.py --config-only",
+    "verify:release:self-test": "python3 scripts/verify_release.py --self-test"
+  },
+  "devDependencies": {
+    "@nicxe/semantic-release-config": "^1.2.3",
+    "@semantic-release/commit-analyzer": "^13.0.1",
+    "@semantic-release/exec": "^7.1.0",
+    "@semantic-release/github": "^12.0.9",
+    "@semantic-release/release-notes-generator": "^14.1.1",
+    "conventional-changelog-conventionalcommits": "^9.3.1",
+    "semantic-release": "^25.0.5"
+  }
+}

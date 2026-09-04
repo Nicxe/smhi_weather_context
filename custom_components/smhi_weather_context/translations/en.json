@@ -1,0 +1,216 @@
+{
+  "title": "SMHI Weather Context",
+  "config": {
+    "flow_title": "SMHI Weather Context: {name}",
+    "step": {
+      "user": {
+        "title": "Set up SMHI Weather Context",
+        "description": "Choose the Swedish location for which weather observations and historical context should be provided.",
+        "data": {
+          "use_home": "Use Home Assistant's home location",
+          "name": "Location name",
+          "latitude": "Latitude",
+          "longitude": "Longitude"
+        },
+        "data_description": {
+          "use_home": "Use the latitude and longitude configured for this Home Assistant installation.",
+          "name": "A name used for the location device and its entities.",
+          "latitude": "Latitude of the location in decimal degrees.",
+          "longitude": "Longitude of the location in decimal degrees."
+        }
+      },
+      "content": {
+        "title": "Choose weather context",
+        "description": "Select the SMHI products to include. Temperature and wind use MetObs station data. Climate context uses PTHBV grid data.",
+        "data": {
+          "enable_temperature": "Temperature",
+          "enable_wind": "Wind",
+          "enable_climate": "Climate context",
+          "enable_precipitation": "Precipitation context"
+        },
+        "data_description": {
+          "enable_temperature": "Add current and historical temperature entities.",
+          "enable_wind": "Add current and historical wind entities.",
+          "enable_climate": "Compare current station observations with PTHBV climate data.",
+          "enable_precipitation": "Include precipitation from PTHBV. This is climate grid data, not a current station observation. Climate context must also be enabled."
+        }
+      },
+      "comparisons": {
+        "title": "Choose historical comparisons",
+        "description": "Select the complete year offsets to compare with the current local hour and day.",
+        "data": {
+          "comparison_years": "Historical comparison years"
+        },
+        "data_description": {
+          "comparison_years": "Select one or more offsets from 1 to 30 years."
+        }
+      },
+      "stations": {
+        "title": "Choose observation stations",
+        "description": "Choose compatible SMHI stations. Temperature and wind may use different stations. The integration never changes a station without your approval.",
+        "data": {
+          "temperature_station": "Temperature station",
+          "wind_station": "Wind station"
+        },
+        "data_description": {
+          "temperature_station": "Station used for both current temperature and all temperature history comparisons.",
+          "wind_station": "Station used for both current wind and all wind history comparisons."
+        }
+      },
+      "confirm": {
+        "title": "Confirm setup",
+        "description": "Confirm {location}. Temperature station: {temperature_station}. Wind station: {wind_station}. Historical data is downloaded after setup and can take time to become available."
+      },
+      "reconfigure": {
+        "title": "Reconfigure SMHI Weather Context",
+        "description": "Update the location. The following steps let you review data products, comparison years, and stations before saving.",
+        "data": {
+          "use_home": "Use Home Assistant's home location",
+          "name": "Location name",
+          "latitude": "Latitude",
+          "longitude": "Longitude"
+        },
+        "data_description": {
+          "use_home": "Use the latitude and longitude configured for this Home Assistant installation.",
+          "name": "The name shown for the location device.",
+          "latitude": "Latitude of the location in decimal degrees.",
+          "longitude": "Longitude of the location in decimal degrees."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Could not connect to SMHI. Check the network connection and try again.",
+      "invalid_response": "SMHI returned an unexpected response. Try again later.",
+      "outside_coverage": "The location is outside the verified coverage of the selected SMHI product.",
+      "no_temperature_station": "No compatible temperature station with sufficient historical coverage was found.",
+      "no_wind_station": "No compatible wind station with sufficient historical coverage was found.",
+      "station_incompatible": "The selected station does not provide both current observations and a corrected historical archive for every required parameter.",
+      "select_feature": "Select at least one of temperature, wind, or climate context.",
+      "precipitation_requires_climate": "Precipitation context requires climate context.",
+      "select_comparison": "Select at least one historical comparison year."
+    },
+    "abort": {
+      "already_configured": "This location is already configured.",
+      "reconfigure_successful": "The integration was reconfigured successfully."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "SMHI Weather Context options",
+        "description": "Choose enabled data products and historical comparison periods. Saving these options reloads the integration.",
+        "data": {
+          "enable_temperature": "Temperature",
+          "enable_wind": "Wind",
+          "enable_climate": "Climate context",
+          "enable_precipitation": "Precipitation context",
+          "comparison_years": "Historical comparison periods"
+        },
+        "data_description": {
+          "enable_temperature": "Enable current and historical temperature entities.",
+          "enable_wind": "Enable current and historical wind entities.",
+          "enable_climate": "Enable PTHBV climate context entities.",
+          "enable_precipitation": "Include precipitation from PTHBV climate grid data.",
+          "comparison_years": "Choose which previous years are exposed as comparison entities."
+        }
+      }
+    },
+    "error": {
+      "precipitation_requires_climate": "Precipitation context requires climate context.",
+      "reconfigure_required": "Reconfigure the integration to select a compatible station before enabling this data product."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature_now": {
+        "name": "Current temperature"
+      },
+      "temperature_today_mean": {
+        "name": "Mean temperature today"
+      },
+      "temperature_10_year_mean": {
+        "name": "Ten-year mean temperature"
+      },
+      "temperature_deviation_10_year": {
+        "name": "Deviation from ten-year mean"
+      },
+      "temperature_climate_normal": {
+        "name": "Climate normal temperature"
+      },
+      "temperature_climate_anomaly": {
+        "name": "Climate temperature anomaly"
+      },
+      "precipitation_climate_normal": {
+        "name": "Climate normal precipitation"
+      },
+      "precipitation_10_year_mean": {
+        "name": "Ten-year mean precipitation"
+      },
+      "precipitation_historical_max": {
+        "name": "Historical maximum precipitation"
+      },
+      "temperature_historical_percentile": {
+        "name": "Historical temperature percentile"
+      },
+      "temperature_historical_max": {
+        "name": "Historical maximum temperature"
+      },
+      "temperature_historical_min": {
+        "name": "Historical minimum temperature"
+      },
+      "temperature_same_hour_year": {
+        "name": "Temperature same hour, {years}-year comparison"
+      },
+      "temperature_today_mean_year": {
+        "name": "Mean temperature today, {years}-year comparison"
+      },
+      "wind_speed_now": {
+        "name": "Current wind speed"
+      },
+      "wind_direction": {
+        "name": "Wind direction"
+      },
+      "wind_direction_degrees": {
+        "name": "Wind direction in degrees"
+      },
+      "wind_gust": {
+        "name": "Wind gust"
+      },
+      "wind_today_mean": {
+        "name": "Mean wind speed today"
+      },
+      "wind_10_year_mean": {
+        "name": "Ten-year mean wind speed"
+      },
+      "wind_deviation_10_year": {
+        "name": "Deviation from ten-year mean wind speed"
+      },
+      "wind_historical_percentile": {
+        "name": "Historical wind percentile"
+      },
+      "wind_same_hour_year": {
+        "name": "Wind speed same hour, {years}-year comparison"
+      },
+      "wind_today_mean_year": {
+        "name": "Mean wind speed today, {years}-year comparison"
+      },
+      "smhi_last_observation": {
+        "name": "Last SMHI observation"
+      },
+      "smhi_last_historical_update": {
+        "name": "Last historical data update"
+      }
+    },
+    "binary_sensor": {
+      "smhi_data_fresh": {
+        "name": "SMHI data fresh"
+      }
+    }
+  },
+  "issues": {
+    "station_unavailable": {
+      "title": "Selected SMHI station is unavailable",
+      "description": "SMHI station {station_id} for data type {kind} is no longer compatible. Open the integration's configuration and select another compatible station. The integration will not change stations automatically."
+    }
+  }
+}

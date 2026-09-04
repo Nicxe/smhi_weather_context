@@ -1,0 +1,17 @@
+﻿Stationsnamn;Stationsnummer;Stationsnät;Mäthöjd (meter över marken)
+Göteborg A;71420;SMHIs stationsnät;2.0
+
+Parameternamn;Beskrivning;Enhet
+Lufttemperatur;momentanvärde, 1 gång/tim;celsius
+
+Tidsperiod (fr.o.m);Tidsperiod (t.o.m);Höjd (meter över havet);Latitud (decimalgrader);Longitud (decimalgrader)
+1999-03-01 00:00:00;2026-06-01 06:20:15;3.038;57.7156;11.9924
+
+Datum;Tid (UTC);Lufttemperatur;Kvalitet;;Tidsutsnitt:
+1991-09-03;00:00:00;12.1;G;;Kvalitetskontrollerade historiska data
+1991-09-03;01:00:00;12.3;Y;;
+1992-02-29;12:00:00;-1.2;G;;
+1992-09-03;00:00:00;13.0;G;;
+2020-09-03;00:00:00;14.2;G;;
+2020-09-03;01:00:00;inte-ett-tal;G;;
+ofullständig;rad

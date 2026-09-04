@@ -1,0 +1,38 @@
+name: Feature request
+description: Suggest a user-facing improvement within the integration scope
+title: "[Feature]: "
+labels:
+  - enhancement
+body:
+  - type: textarea
+    id: problem
+    attributes:
+      label: User need
+      description: What Home Assistant use case or problem should this solve?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposed behavior
+      description: Describe the desired behavior without relying on undocumented SMHI endpoints.
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Expected data source
+      options:
+        - MetObs
+        - PTHBV
+        - No new meteorological data
+        - Unsure
+    validations:
+      required: true
+  - type: checkboxes
+    id: scope
+    attributes:
+      label: Scope confirmation
+      options:
+        - label: This request does not require a non-SMHI weather source.
+          required: true

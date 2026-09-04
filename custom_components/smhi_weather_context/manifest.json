@@ -1,0 +1,12 @@
+{
+  "domain": "smhi_weather_context",
+  "name": "SMHI Weather Context",
+  "codeowners": ["@Nicxe"],
+  "config_flow": true,
+  "documentation": "https://github.com/Nicxe/smhi_weather_context",
+  "integration_type": "service",
+  "iot_class": "cloud_polling",
+  "issue_tracker": "https://github.com/Nicxe/smhi_weather_context/issues",
+  "requirements": [],
+  "version": "0.1.0"
+}

@@ -1,0 +1,216 @@
+{
+  "title": "SMHI Väderperspektiv",
+  "config": {
+    "flow_title": "SMHI Väderperspektiv: {name}",
+    "step": {
+      "user": {
+        "title": "Konfigurera SMHI Väderperspektiv",
+        "description": "Välj den svenska plats som ska få väderobservationer och historiska jämförelser.",
+        "data": {
+          "use_home": "Använd Home Assistants hemposition",
+          "name": "Platsnamn",
+          "latitude": "Latitud",
+          "longitude": "Longitud"
+        },
+        "data_description": {
+          "use_home": "Använd den latitud och longitud som är inställd för den här Home Assistant-installationen.",
+          "name": "Ett namn som används för platsens enhet och entiteter.",
+          "latitude": "Platsens latitud i decimalgrader.",
+          "longitude": "Platsens longitud i decimalgrader."
+        }
+      },
+      "content": {
+        "title": "Välj väderperspektiv",
+        "description": "Välj vilka SMHI-produkter som ska ingå. Temperatur och vind använder stationsdata från MetObs. Klimatperspektivet använder griddata från PTHBV.",
+        "data": {
+          "enable_temperature": "Temperatur",
+          "enable_wind": "Vind",
+          "enable_climate": "Klimatperspektiv",
+          "enable_precipitation": "Nederbördsperspektiv"
+        },
+        "data_description": {
+          "enable_temperature": "Lägg till entiteter för aktuell och historisk temperatur.",
+          "enable_wind": "Lägg till entiteter för aktuell och historisk vind.",
+          "enable_climate": "Jämför aktuella stationsobservationer med klimatdata från PTHBV.",
+          "enable_precipitation": "Ta med nederbörd från PTHBV. Detta är klimatbaserad griddata, inte en aktuell stationsobservation. Klimatperspektiv måste också vara aktiverat."
+        }
+      },
+      "comparisons": {
+        "title": "Välj historiska jämförelser",
+        "description": "Välj vilka hela år bakåt som ska jämföras med aktuell lokal timme och dag.",
+        "data": {
+          "comparison_years": "Historiska jämförelseår"
+        },
+        "data_description": {
+          "comparison_years": "Välj ett eller flera intervall från 1 till 30 år."
+        }
+      },
+      "stations": {
+        "title": "Välj observationsstationer",
+        "description": "Välj kompatibla SMHI-stationer. Temperatur och vind kan använda olika stationer. Integrationen byter aldrig station utan ditt godkännande.",
+        "data": {
+          "temperature_station": "Temperaturstation",
+          "wind_station": "Vindstation"
+        },
+        "data_description": {
+          "temperature_station": "Stationen som används för både aktuell temperatur och alla historiska temperaturjämförelser.",
+          "wind_station": "Stationen som används för både aktuell vind och alla historiska vindjämförelser."
+        }
+      },
+      "confirm": {
+        "title": "Bekräfta konfigurationen",
+        "description": "Bekräfta {location}. Temperaturstation: {temperature_station}. Vindstation: {wind_station}. Historiska data hämtas efter konfigurationen och kan ta en stund att bli tillgängliga."
+      },
+      "reconfigure": {
+        "title": "Konfigurera om SMHI Väderperspektiv",
+        "description": "Uppdatera platsen. I följande steg kan du granska datakällor, jämförelseår och stationer innan du sparar.",
+        "data": {
+          "use_home": "Använd Home Assistants hemposition",
+          "name": "Platsnamn",
+          "latitude": "Latitud",
+          "longitude": "Longitud"
+        },
+        "data_description": {
+          "use_home": "Använd den latitud och longitud som är inställd för den här Home Assistant-installationen.",
+          "name": "Namnet som visas för platsens enhet.",
+          "latitude": "Platsens latitud i decimalgrader.",
+          "longitude": "Platsens longitud i decimalgrader."
+        }
+      }
+    },
+    "error": {
+      "cannot_connect": "Det gick inte att ansluta till SMHI. Kontrollera nätverksanslutningen och försök igen.",
+      "invalid_response": "SMHI returnerade ett oväntat svar. Försök igen senare.",
+      "outside_coverage": "Platsen ligger utanför den verifierade täckningen för den valda SMHI-produkten.",
+      "no_temperature_station": "Ingen kompatibel temperaturstation med tillräcklig historisk täckning hittades.",
+      "no_wind_station": "Ingen kompatibel vindstation med tillräcklig historisk täckning hittades.",
+      "station_incompatible": "Den valda stationen saknar aktuella observationer eller korrigerat historiskt arkiv för någon av de parametrar som krävs.",
+      "select_feature": "Välj minst ett av temperatur, vind eller klimatperspektiv.",
+      "precipitation_requires_climate": "Nederbördsperspektiv kräver att klimatperspektiv är aktiverat.",
+      "select_comparison": "Välj minst ett historiskt jämförelseår."
+    },
+    "abort": {
+      "already_configured": "Den här platsen är redan konfigurerad.",
+      "reconfigure_successful": "Integrationen konfigurerades om."
+    }
+  },
+  "options": {
+    "step": {
+      "init": {
+        "title": "Alternativ för SMHI Väderperspektiv",
+        "description": "Välj aktiverade datakällor och historiska jämförelseperioder. När alternativen sparas läses integrationen om.",
+        "data": {
+          "enable_temperature": "Temperatur",
+          "enable_wind": "Vind",
+          "enable_climate": "Klimatperspektiv",
+          "enable_precipitation": "Nederbördsperspektiv",
+          "comparison_years": "Historiska jämförelseperioder"
+        },
+        "data_description": {
+          "enable_temperature": "Aktivera entiteter för aktuell och historisk temperatur.",
+          "enable_wind": "Aktivera entiteter för aktuell och historisk vind.",
+          "enable_climate": "Aktivera entiteter för klimatperspektiv från PTHBV.",
+          "enable_precipitation": "Ta med nederbörd från PTHBV:s klimatbaserade griddata.",
+          "comparison_years": "Välj vilka tidigare år som ska visas som jämförelseentiteter."
+        }
+      }
+    },
+    "error": {
+      "precipitation_requires_climate": "Nederbördsperspektiv kräver att klimatperspektiv är aktiverat.",
+      "reconfigure_required": "Konfigurera om integrationen och välj en kompatibel station innan datakällan aktiveras."
+    }
+  },
+  "entity": {
+    "sensor": {
+      "temperature_now": {
+        "name": "Aktuell temperatur"
+      },
+      "temperature_today_mean": {
+        "name": "Medeltemperatur i dag"
+      },
+      "temperature_10_year_mean": {
+        "name": "Temperaturens tioårsmedel"
+      },
+      "temperature_deviation_10_year": {
+        "name": "Avvikelse från temperaturens tioårsmedel"
+      },
+      "temperature_climate_normal": {
+        "name": "Klimatnormal temperatur"
+      },
+      "temperature_climate_anomaly": {
+        "name": "Temperaturens klimatanomali"
+      },
+      "precipitation_climate_normal": {
+        "name": "Klimatnormal nederbörd"
+      },
+      "precipitation_10_year_mean": {
+        "name": "Nederbördens tioårsmedel"
+      },
+      "precipitation_historical_max": {
+        "name": "Historisk maxnederbörd"
+      },
+      "temperature_historical_percentile": {
+        "name": "Historisk temperaturpercentil"
+      },
+      "temperature_historical_max": {
+        "name": "Historisk maxtemperatur"
+      },
+      "temperature_historical_min": {
+        "name": "Historisk mintemperatur"
+      },
+      "temperature_same_hour_year": {
+        "name": "Temperatur samma timme, jämförelse {years} år"
+      },
+      "temperature_today_mean_year": {
+        "name": "Medeltemperatur i dag, jämförelse {years} år"
+      },
+      "wind_speed_now": {
+        "name": "Aktuell vindhastighet"
+      },
+      "wind_direction": {
+        "name": "Vindriktning"
+      },
+      "wind_direction_degrees": {
+        "name": "Vindriktning i grader"
+      },
+      "wind_gust": {
+        "name": "Vindby"
+      },
+      "wind_today_mean": {
+        "name": "Medelvind i dag"
+      },
+      "wind_10_year_mean": {
+        "name": "Vindens tioårsmedel"
+      },
+      "wind_deviation_10_year": {
+        "name": "Avvikelse från vindens tioårsmedel"
+      },
+      "wind_historical_percentile": {
+        "name": "Historisk vindpercentil"
+      },
+      "wind_same_hour_year": {
+        "name": "Vindhastighet samma timme, jämförelse {years} år"
+      },
+      "wind_today_mean_year": {
+        "name": "Medelvind i dag, jämförelse {years} år"
+      },
+      "smhi_last_observation": {
+        "name": "Senaste SMHI-observation"
+      },
+      "smhi_last_historical_update": {
+        "name": "Senaste uppdatering av historiska data"
+      }
+    },
+    "binary_sensor": {
+      "smhi_data_fresh": {
+        "name": "SMHI-data är aktuella"
+      }
+    }
+  },
+  "issues": {
+    "station_unavailable": {
+      "title": "Den valda SMHI-stationen är inte tillgänglig",
+      "description": "SMHI-station {station_id} för datatypen {kind} är inte längre kompatibel. Öppna integrationens konfiguration och välj en annan kompatibel station. Integrationen byter inte station automatiskt."
+    }
+  }
+}

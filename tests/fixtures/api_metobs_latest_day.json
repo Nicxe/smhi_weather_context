@@ -1,0 +1,56 @@
+{
+  "updated": 1788447600000,
+  "parameter": {
+    "key": "1",
+    "name": "Lufttemperatur",
+    "summary": "momentanvärde, 1 gång/tim",
+    "unit": "celsius"
+  },
+  "station": {
+    "key": "71420",
+    "name": "Göteborg A",
+    "owner": "SMHI",
+    "ownerCategory": "CLIMATE",
+    "measuringStations": "CORE",
+    "height": 2.0
+  },
+  "period": {
+    "key": "latest-day",
+    "from": 1788357601000,
+    "to": 1788447600000,
+    "summary": "Data från senaste dygnet",
+    "sampling": "Ej angivet"
+  },
+  "position": [
+    {
+      "from": 920246400000,
+      "to": 1788448815000,
+      "height": 3.038,
+      "latitude": 57.7156,
+      "longitude": 11.9924
+    }
+  ],
+  "value": [
+    {
+      "date": 1788444000000,
+      "value": "16.6",
+      "quality": "Y"
+    },
+    {
+      "date": 1788447600000,
+      "value": "15.9",
+      "quality": "G"
+    },
+    {
+      "date": "not-a-timestamp",
+      "value": "12.0",
+      "quality": "G"
+    },
+    {
+      "date": 1788447600000,
+      "value": null,
+      "quality": "G"
+    }
+  ],
+  "link": []
+}

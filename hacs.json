@@ -1,0 +1,9 @@
+{
+  "name": "SMHI Weather Context",
+  "homeassistant": "2026.9.0",
+  "country": [
+    "SE"
+  ],
+  "filename": "smhi_weather_context.zip",
+  "zip_release": true
+}

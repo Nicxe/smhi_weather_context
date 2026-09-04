@@ -1,0 +1,21 @@
+name: PR target check
+
+on:
+  pull_request_target:
+    branches: [main, beta]
+    types: [opened, reopened, synchronize]
+
+permissions:
+  contents: read
+
+jobs:
+  reserved-release-branches:
+    if: >-
+      github.actor != 'Nicxe' &&
+      github.actor != 'dependabot[bot]'
+    runs-on: ubuntu-latest
+    steps:
+      - name: Reject external PRs targeting managed release branches
+        run: |
+          echo "PRs must target dev. beta and main are maintainer-managed release branches."
+          exit 1

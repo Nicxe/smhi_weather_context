@@ -1,0 +1,89 @@
+# Self-assessment for a custom integration. This does not claim an official
+# Home Assistant quality tier. Every Home Assistant 2026.9 rule is included;
+# unverified or not-yet-implemented rules remain explicitly marked as todo.
+rules:
+  action-setup:
+    status: exempt
+    comment: The integration does not register service actions.
+  appropriate-polling: done
+  brands: todo
+  common-modules: done
+  config-flow: done
+  config-flow-test-coverage: done
+  dependency-transparency: done
+  docs-actions:
+    status: exempt
+    comment: The integration does not register service actions.
+  docs-conditions:
+    status: exempt
+    comment: The integration does not provide conditions.
+  docs-high-level-description: done
+  docs-installation-instructions: done
+  docs-removal-instructions: done
+  docs-triggers:
+    status: exempt
+    comment: The integration does not provide triggers.
+  entity-event-setup:
+    status: exempt
+    comment: The integration does not subscribe to entity events.
+  entity-unique-id: done
+  has-entity-name: done
+  runtime-data: done
+  test-before-configure: done
+  test-before-setup: done
+  unique-config-entry: done
+
+  action-exceptions:
+    status: exempt
+    comment: The integration does not register service actions.
+  config-entry-unloading: done
+  docs-configuration-parameters: done
+  docs-installation-parameters: done
+  entity-unavailable: done
+  integration-owner: done
+  log-when-unavailable: done
+  parallel-updates: done
+  reauthentication-flow:
+    status: exempt
+    comment: The SMHI open-data endpoints used by the integration do not require authentication.
+  test-coverage: done
+
+  devices: done
+  diagnostics: done
+  discovery:
+    status: exempt
+    comment: Entries represent user-selected geographic locations and cannot be discovered.
+  discovery-update-info:
+    status: exempt
+    comment: The integration does not use discovery.
+  docs-data-update: done
+  docs-examples: done
+  docs-known-limitations: done
+  docs-supported-devices: done
+  docs-supported-functions: done
+  docs-troubleshooting: done
+  docs-use-cases: done
+  dynamic-devices:
+    status: exempt
+    comment: Each config entry represents one user-selected location and does not discover devices at runtime.
+  entity-category: done
+  entity-device-class: done
+  entity-disabled-by-default: done
+  entity-translations: done
+  exception-translations: done
+  icon-translations:
+    status: exempt
+    comment: The integration does not expose state-dependent entity icons.
+  reconfiguration-flow: done
+  repair-issues: done
+  stale-devices:
+    status: exempt
+    comment: The integration creates one persistent service device per config entry and no dynamically discovered devices.
+
+  async-dependency:
+    status: exempt
+    comment: The integration has no external runtime dependency.
+  inject-websession:
+    status: exempt
+    comment: There is no external dependency; the internal API client receives Home Assistant's shared aiohttp session.
+  strict-typing: done

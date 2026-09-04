@@ -1,0 +1,66 @@
+name: Bug report
+description: Report incorrect or unreliable integration behavior
+title: "[Bug]: "
+labels:
+  - bug
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Do not include precise coordinates, credentials, raw cache files, or unredacted diagnostics.
+  - type: input
+    id: integration_version
+    attributes:
+      label: Integration version
+      placeholder: v1.0.0 or v1.0.0-beta.1
+    validations:
+      required: true
+  - type: input
+    id: home_assistant_version
+    attributes:
+      label: Home Assistant version
+      placeholder: 2026.9.0
+    validations:
+      required: true
+  - type: dropdown
+    id: source
+    attributes:
+      label: Affected data source
+      options:
+        - MetObs current observations
+        - MetObs historical observations
+        - PTHBV climate perspective
+        - Configuration or setup
+        - Diagnostics or Repairs
+        - Unknown
+    validations:
+      required: true
+  - type: textarea
+    id: description
+    attributes:
+      label: What happened?
+      description: Describe the observable behavior and what you expected instead.
+    validations:
+      required: true
+  - type: textarea
+    id: reproduction
+    attributes:
+      label: Reproduction steps
+      description: Provide the smallest safe sequence that reproduces the problem.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Redacted logs
+      render: text
+      description: Remove precise location data, URLs containing coordinates, tokens, and unrelated logs.
+  - type: checkboxes
+    id: checklist
+    attributes:
+      label: Checklist
+      options:
+        - label: I searched existing issues.
+          required: true
+        - label: I removed precise coordinates and credentials.
+          required: true
