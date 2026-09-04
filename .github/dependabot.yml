@@ -12,6 +12,11 @@ updates:
       prefix-development: chore(deps-dev)
     labels:
       - dependencies
+    ignore:
+      # Release config 1.2.3 requires >=8 <10; revisit when its peer range changes.
+      - dependency-name: conventional-changelog-conventionalcommits
+        update-types:
+          - version-update:semver-major
     groups:
       release-tooling:
         dependency-type: development

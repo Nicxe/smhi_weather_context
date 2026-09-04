@@ -40,54 +40,64 @@ class PthbvClient:
             },
         )
         data = await self._client.async_get_json(url)
-        dates = data.get("dates")
-        points = data.get("point_values")
-        if (
-            not isinstance(dates, list)
-            or not isinstance(points, list)
-            or len(points) != 1
-        ):
-            raise SmhiApiResponseError("PTHBV response structure is invalid")
-        point = points[0]
-        if not isinstance(point, dict):
-            raise SmhiApiResponseError("PTHBV point data is invalid")
-        coordinate_system = data.get("coord_sys_info")
-        if (
-            not isinstance(coordinate_system, dict)
-            or coordinate_system.get("EPSG") != 4326
-        ):
-            raise SmhiApiResponseError("PTHBV coordinate system is invalid")
-        try:
-            parsed_dates = [date.fromisoformat(str(value)) for value in dates]
-        except ValueError as err:
-            raise SmhiApiResponseError("PTHBV dates are invalid") from err
-        if (
-            not parsed_dates
-            or parsed_dates != sorted(set(parsed_dates))
-            or parsed_dates[0] != date(start_year, 1, 1)
-            or parsed_dates[-1] != date(end_year, 12, 31)
-            or len(parsed_dates)
-            != (date(end_year, 12, 31) - date(start_year, 1, 1)).days + 1
-            or any(
-                right - left != timedelta(days=1)
-                for left, right in pairwise(parsed_dates)
-            )
-        ):
-            raise SmhiApiResponseError("PTHBV period is incomplete or unordered")
-        for variable in variables:
-            values = point.get(variable)
-            if not isinstance(values, list) or len(values) != len(dates):
-                raise SmhiApiResponseError("PTHBV values do not match dates")
-            for value in values:
-                if value is None:
-                    continue
-                try:
-                    finite = math.isfinite(float(value))
-                except (TypeError, ValueError) as err:
-                    raise SmhiApiResponseError("PTHBV contains invalid values") from err
-                if not finite:
-                    raise SmhiApiResponseError("PTHBV contains invalid values")
-        return data
+        return validate_daily_data(
+            data, start_year, end_year, precipitation=precipitation
+        )
+
+
+def validate_daily_data(
+    data: dict[str, Any],
+    start_year: int,
+    end_year: int,
+    *,
+    precipitation: bool = False,
+) -> dict[str, Any]:
+    """Validate a complete daily response or decoded cache without modifying it."""
+    if not isinstance(data, dict):
+        raise SmhiApiResponseError("PTHBV response structure is invalid")
+    dates = data.get("dates")
+    points = data.get("point_values")
+    if not isinstance(dates, list) or not isinstance(points, list) or len(points) != 1:
+        raise SmhiApiResponseError("PTHBV response structure is invalid")
+    point = points[0]
+    if not isinstance(point, dict):
+        raise SmhiApiResponseError("PTHBV point data is invalid")
+    coordinate_system = data.get("coord_sys_info")
+    if not isinstance(coordinate_system, dict) or coordinate_system.get("EPSG") != 4326:
+        raise SmhiApiResponseError("PTHBV coordinate system is invalid")
+    try:
+        parsed_dates = [date.fromisoformat(value) for value in dates]
+    except TypeError, ValueError:
+        raise SmhiApiResponseError("PTHBV dates are invalid") from None
+    if (
+        not parsed_dates
+        or parsed_dates != sorted(set(parsed_dates))
+        or parsed_dates[0] != date(start_year, 1, 1)
+        or parsed_dates[-1] != date(end_year, 12, 31)
+        or len(parsed_dates)
+        != (date(end_year, 12, 31) - date(start_year, 1, 1)).days + 1
+        or any(
+            right - left != timedelta(days=1) for left, right in pairwise(parsed_dates)
+        )
+    ):
+        raise SmhiApiResponseError("PTHBV period is incomplete or unordered")
+    variables = ["t", "p"] if precipitation else ["t"]
+    for variable in variables:
+        values = point.get(variable)
+        if not isinstance(values, list) or len(values) != len(dates):
+            raise SmhiApiResponseError("PTHBV values do not match dates")
+        for value in values:
+            if value is None:
+                continue
+            if isinstance(value, bool):
+                raise SmhiApiResponseError("PTHBV contains invalid values")
+            try:
+                finite = math.isfinite(float(value))
+            except TypeError, ValueError, OverflowError:
+                raise SmhiApiResponseError("PTHBV contains invalid values") from None
+            if not finite:
+                raise SmhiApiResponseError("PTHBV contains invalid values")
+    return data
 
 
 def values_for_calendar_date(

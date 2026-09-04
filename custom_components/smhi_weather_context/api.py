@@ -18,6 +18,10 @@ from .const import ALLOWED_HOSTS, MAX_ARCHIVE_BYTES, MAX_JSON_BYTES
 class SmhiApiError(Exception):
     """Base SMHI client error."""
 
+    def __init__(self, message: str = "", *, http_status: int | None = None) -> None:
+        super().__init__(message)
+        self.http_status = http_status
+
 
 class SmhiApiConnectionError(SmhiApiError):
     """SMHI could not be reached."""
@@ -92,16 +96,22 @@ class SmhiApiClient:
                     # Do not block a config flow for a long server-requested wait,
                     # and never retry earlier than the server permits.
                     if attempt + 1 >= attempts or delay > 30:
-                        raise SmhiApiUnavailableError(f"SMHI returned HTTP {status}")
+                        raise SmhiApiUnavailableError(
+                            f"SMHI returned HTTP {status}", http_status=status
+                        )
                     await asyncio.sleep(delay)
                     continue
                 if response.status == 400:
                     response.release()
-                    raise SmhiCoverageError("Coordinates are outside SMHI coverage")
+                    raise SmhiCoverageError(
+                        "Coordinates are outside SMHI coverage", http_status=400
+                    )
                 if response.status != 200:
                     status = response.status
                     response.release()
-                    raise SmhiApiResponseError(f"SMHI returned HTTP {status}")
+                    raise SmhiApiResponseError(
+                        f"SMHI returned HTTP {status}", http_status=status
+                    )
                 length = response.content_length
                 if length is not None and length > max_bytes:
                     response.release()

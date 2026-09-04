@@ -39,7 +39,7 @@ from .const import (
 )
 from .metobs import MetObsClient, parse_archive_for_dates
 from .models import EntryOptions, Observation, SourceStatus, WeatherContextData
-from .pthbv import PthbvClient, values_for_calendar_date
+from .pthbv import PthbvClient, validate_daily_data, values_for_calendar_date
 from .repairs import async_clear_station_issue, async_create_station_issue
 from .storage import SourceCache
 
@@ -73,12 +73,14 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
         self.pthbv = pthbv
         self.cache = cache
         self._history_date: date | None = None
+        self._history_values_date: date | None = None
         self._temperature_history: list[Observation] = []
         self._wind_history: list[Observation] = []
         self._climate_values: dict[int, float] = {}
         self._precipitation_values: dict[int, float] = {}
         self._history_cached_at: datetime | None = None
         self._history_status: dict[str, SourceStatus] = {}
+        self._current_status: dict[str, SourceStatus] = {}
         self._stations_validated_at: datetime | None = None
         self._invalid_station_kinds: set[str] = set()
         self._history_enabled = history_enabled
@@ -86,6 +88,33 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
     def enable_history(self) -> None:
         """Allow heavy history initialization after first setup completes."""
         self._history_enabled = True
+
+    @property
+    def source_status(self) -> dict[str, SourceStatus]:
+        """Expose current and history sources without overwriting either status."""
+        return {
+            **self._current_status,
+            **{
+                f"{name}_history" if name in {"temperature", "wind"} else name: status
+                for name, status in self._history_status.items()
+            },
+        }
+
+    @staticmethod
+    def _failed_status(
+        previous: SourceStatus | None,
+        attempted_at: datetime,
+        error: BaseException | str,
+    ) -> SourceStatus:
+        """Preserve the last success without leaking provider messages or URLs."""
+        return SourceStatus(
+            available=False,
+            last_update=previous.last_update if previous else None,
+            last_attempt=attempted_at,
+            last_success=previous.last_success if previous else None,
+            error=error if isinstance(error, str) else type(error).__name__,
+            http_status=error.http_status if isinstance(error, SmhiApiError) else None,
+        )
 
     async def _async_update_data(self) -> WeatherContextData:
         try:
@@ -156,8 +185,8 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
             self.options.enable_temperature
             and "temperature" in self._invalid_station_kinds
         ):
-            statuses["temperature"] = SourceStatus(
-                available=False, error="StationUnavailable"
+            statuses["temperature"] = self._failed_status(
+                self._current_status.get("temperature"), now, "StationUnavailable"
             )
         elif self.options.enable_temperature:
             current_tasks["temperature"] = self.metobs.async_latest_day(
@@ -166,7 +195,9 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
         if self.options.enable_wind and "wind" in self._invalid_station_kinds:
             statuses.update(
                 {
-                    key: SourceStatus(available=False, error="StationUnavailable")
+                    key: self._failed_status(
+                        self._current_status.get(key), now, "StationUnavailable"
+                    )
                     for key in ("wind_speed", "wind_direction", "wind_gust")
                 }
             )
@@ -188,10 +219,9 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
         results = await asyncio.gather(*current_tasks.values(), return_exceptions=True)
         current: dict[str, tuple[list[Observation], dict[str, Any]]] = {}
         for name, result in zip(names, results, strict=True):
+            previous_status = self._current_status.get(name)
             if isinstance(result, BaseException):
-                statuses[name] = SourceStatus(
-                    available=False, error=type(result).__name__
-                )
+                statuses[name] = self._failed_status(previous_status, now, result)
                 continue
             current[name] = result
             latest_item = latest(result[0])
@@ -200,17 +230,24 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
                 available=latest_item is not None,
                 stale=stale,
                 last_update=latest_item.time if latest_item else None,
+                last_attempt=now,
+                last_success=(
+                    datetime.now(UTC)
+                    if latest_item is not None
+                    else previous_status.last_success
+                    if previous_status
+                    else None
+                ),
             )
 
+        self._current_status = statuses
         if not current and names:
             raise UpdateFailed("No current SMHI source is available")
 
         if self._history_enabled and self._history_date != target.date():
             await self._async_load_history(target)
 
-        data = WeatherContextData(
-            source_status={**statuses, **self._history_status}, updated_at=now
-        )
+        data = WeatherContextData(source_status=self.source_status, updated_at=now)
         if "temperature" in current:
             self._populate_temperature(data, current["temperature"][0], target, now)
         if "wind_speed" in current:
@@ -240,6 +277,13 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
         return data
 
     async def _async_load_history(self, target: datetime) -> None:
+        attempted_at = datetime.now(UTC)
+        if self._history_values_date != target.date():
+            # Derived samples belong to one local calendar day, unlike the full
+            # cached series. Never label yesterday's samples with today's date.
+            for name in ("temperature", "wind", "climate"):
+                self._clear_history_values(name)
+            self._history_values_date = target.date()
         years_back = set(self.options.comparison_years) | set(range(1, 11))
         years = {target.year - offset for offset in years_back}
         tasks: dict[str, Any] = {}
@@ -267,19 +311,20 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
             previous_status = self._history_status.get(name)
             if isinstance(result, BaseException):
                 had_error = True
-                self._history_status[name] = SourceStatus(
-                    available=False, error=type(result).__name__
-                )
+                self._clear_history_values(name)
+                status = self._failed_status(previous_status, attempted_at, result)
+                self._history_status[name] = status
                 if previous_status is None or previous_status.available:
                     _LOGGER.warning(
                         "SMHI %s history is unavailable (%s)",
                         name,
-                        type(result).__name__,
+                        (
+                            f"{status.error}; HTTP {status.http_status}"
+                            if status.http_status is not None
+                            else status.error
+                        ),
                     )
                 continue
-            self._history_status[name] = SourceStatus(
-                available=True, last_update=datetime.now(UTC)
-            )
             try:
                 if name == "temperature":
                     self._temperature_history = await self.hass.async_add_executor_job(
@@ -302,24 +347,45 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
                         )
                     )
                 elif name == "climate":
-                    self._climate_values = values_for_calendar_date(
+                    climate_values = values_for_calendar_date(
                         result, target.month, target.day, "t"
                     )
-                    self._precipitation_values = values_for_calendar_date(
+                    precipitation_values = values_for_calendar_date(
                         result, target.month, target.day, "p"
                     )
+                    self._climate_values = climate_values
+                    self._precipitation_values = precipitation_values
             except SmhiApiError, TypeError, ValueError:
                 had_error = True
-                self._history_status[name] = SourceStatus(
-                    available=False, error="HistoryValidationError"
+                self._clear_history_values(name)
+                self._history_status[name] = self._failed_status(
+                    previous_status, attempted_at, "HistoryValidationError"
                 )
                 if previous_status is None or previous_status.available:
                     _LOGGER.warning("SMHI %s history could not be validated", name)
             else:
+                succeeded_at = datetime.now(UTC)
+                self._history_status[name] = SourceStatus(
+                    available=True,
+                    last_update=succeeded_at,
+                    last_attempt=attempted_at,
+                    last_success=succeeded_at,
+                )
                 if previous_status is not None and not previous_status.available:
                     _LOGGER.info("SMHI %s history is available again", name)
         self._history_date = None if had_error else target.date()
-        self._history_cached_at = datetime.now(UTC)
+        if tasks and not had_error and not self._invalid_station_kinds:
+            self._history_cached_at = datetime.now(UTC)
+
+    def _clear_history_values(self, name: str) -> None:
+        """Invalidate derived values, keeping the full on-disk cache untouched."""
+        if name == "temperature":
+            self._temperature_history = []
+        elif name == "wind":
+            self._wind_history = []
+        else:
+            self._climate_values = {}
+            self._precipitation_values = {}
 
     async def _async_archive(self, key: str, parameter: int, station_id: int) -> str:
         fresh = await self.cache.async_get(key, max_age=timedelta(days=28))
@@ -346,7 +412,13 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
         key = f"pthbv_daily_{location_identity}_through_{target.year - 1}"
         fresh = await self.cache.async_get(key, max_age=timedelta(days=28))
         if fresh:
-            return self._decode_cached_pthbv(fresh.payload)
+            try:
+                return await self.hass.async_add_executor_job(
+                    self._decode_cached_pthbv, fresh.payload, target.year - 1
+                )
+            except SmhiApiError, ValueError:
+                # A damaged or incompatible cache must not prevent a fresh fetch.
+                pass
         try:
             data = await self.pthbv.async_daily(
                 self.options.location,
@@ -357,19 +429,26 @@ class SmhiWeatherContextCoordinator(DataUpdateCoordinator[WeatherContextData]):
         except SmhiApiError:
             stale = await self.cache.async_get(key)
             if stale:
-                return self._decode_cached_pthbv(stale.payload)
+                try:
+                    return await self.hass.async_add_executor_job(
+                        self._decode_cached_pthbv, stale.payload, target.year - 1
+                    )
+                except SmhiApiError, ValueError:
+                    # Preserve the HTTP failure when the fallback is unusable.
+                    pass
             raise
         payload = json.dumps(data, ensure_ascii=False, separators=(",", ":"))
         await self.cache.async_set(key, payload, {"source": "PTHBV"})
         return data
 
-    @staticmethod
-    def _decode_cached_pthbv(payload: str) -> dict[str, Any]:
-        """Decode a validated object root from private cache."""
+    def _decode_cached_pthbv(self, payload: str, end_year: int) -> dict[str, Any]:
+        """Require cached data to meet the same daily contract as a download."""
         value = json.loads(payload)
         if not isinstance(value, dict):
             raise SmhiApiError("Cached PTHBV data is invalid")
-        return value
+        return validate_daily_data(
+            value, 1961, end_year, precipitation=self.options.enable_precipitation
+        )
 
     @staticmethod
     def _target_for_year(target: datetime, year: int) -> datetime | None:
