@@ -178,6 +178,8 @@ The repository includes Ruff lint and formatting checks, strict typing, Home Ass
 
 Use [GitHub Issues](https://github.com/Nicxe/smhi_weather_context/issues) for bugs and feature requests. Follow [SECURITY.md](SECURITY.md) for security concerns.
 
+If SMHI Weather Context is useful to you, [star the repository](https://github.com/Nicxe/smhi_weather_context) to help others find it. The best way to support ongoing development is a [one-time or monthly GitHub sponsorship](https://github.com/sponsors/Nicxe). [Buy Niklas a coffee](https://buymeacoffee.com/niklasv) if you prefer a quick thank-you.
+
 ## License and attribution
 
 The integration code is distributed under the [MIT License](LICENSE). Weather observations and climate data are provided by **SMHI** and remain subject to [SMHI's data usage terms](https://www.smhi.se/data/om-smhis-data/villkor-for-anvandning). Calculated comparisons are derived values, not official SMHI forecasts or warnings.
