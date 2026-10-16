@@ -15,12 +15,12 @@
     "verify:release:self-test": "python3 scripts/verify_release.py --self-test"
   },
   "devDependencies": {
-    "@nicxe/semantic-release-config": "^1.2.3",
+    "@nicxe/semantic-release-config": "^1.4.1",
     "@semantic-release/commit-analyzer": "^13.0.1",
     "@semantic-release/exec": "^7.1.0",
     "@semantic-release/github": "^12.0.10",
     "@semantic-release/release-notes-generator": "^14.1.1",
-    "conventional-changelog-conventionalcommits": "^10.4.0",
+    "conventional-changelog-conventionalcommits": "^10.4.1",
     "semantic-release": "^25.0.5"
   }
 }
